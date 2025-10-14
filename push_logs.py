@@ -47,8 +47,7 @@ def fetch_job_logs(job_id):
         print(f"Logs not ready yet for job ID: {job_id}")
         return []
     else:
-        print(f"Failed to fetch logs for job {job_id}: {response.status_code}")
-        return []
+        raise Exception(f"Failed to fetch logs for job {job_id}: {response.status_code}")
 
 def push_to_loki(logs, labels, job_name=None, job_id=None):
     """Push logs to Loki."""
@@ -74,7 +73,7 @@ def push_to_loki(logs, labels, job_name=None, job_id=None):
     if response.status_code == 204:
         print("Logs successfully sent to Loki.")
     else:
-        print(f"Failed to send logs to Loki: {response.status_code}, {response.text}")
+        raise RuntimeError(f"Failed to send logs to Loki: {response.status_code}, {response.text}")
 
 def main():
     jobs = get_jobs(RUN_ID)
