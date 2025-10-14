@@ -10,14 +10,15 @@ The **Send Logs to Loki** GitHub Action collects logs from all jobs in a GitHub 
 
 ## Inputs
 
-| Name                    | Description                                                | Required | Default              |
-| ----------------------- | -----------------------------------------------------------| -------- | -------------------- |
-| `loki_endpoint`         | Loki push endpoint                                         | Yes      |                      |
-| `labels`                | Custom labels for logs (comma-separated key=value pairs)   | No       | `job=github-actions` |
-| `tenant`                | Tenant value for `X-Scope-OrgID` header                    | No       | `tenant=default`     | 
-| `github_token`          | GitHub token for API authentication                        | Yes      |                      |
-| `max_retries`           | Maximum number of retry attempts for fetching logs per job | No      |  5                   |
-| `retry_interval_seconds`| Interval in seconds between retry attempts                 | No      |  10                   |
+| Name                    | Description                                                   | Required | Default              |
+| ----------------------- | --------------------------------------------------------------| -------- | -------------------- |
+| `loki_endpoint`         | Loki push endpoint                                            | Yes      |                      |
+| `labels`                | Custom labels for logs (comma-separated key=value pairs)      | No       | `job=github-actions` |
+| `structured_metadata`   | Structured metadata for logs (comma-separated key=value pairs)| No       | `job=github-actions` |
+| `tenant`                | Tenant value for `X-Scope-OrgID` header                       | No       | `tenant=default`     | 
+| `github_token`          | GitHub token for API authentication                           | Yes      |                      |
+| `max_retries`           | Maximum number of retry attempts for fetching logs per job    | No       |  5                   |
+| `retry_interval_seconds`| Interval in seconds between retry attempts                    | No       |  10                   |
 
 ## Example Usage
 
@@ -42,8 +43,10 @@ The **Send Logs to Loki** GitHub Action collects logs from all jobs in a GitHub 
 
 ## How to Configure
 
-- **Add Custom Labels**: Use the `labels` input to include additional metadata for your logs.
+- **Add Custom Labels**: Use the `labels` input to include additional labels for your logs (these are indexed, so be aware of [cardinality](https://grafana.com/docs/loki/latest/get-started/labels/cardinality/)).
   - Example: `labels: "job=github-actions,env=production"`
+- **Add Custom Metadata**: Use the `structured_metadata` input to include additional [structured metadata](https://grafana.com/docs/loki/latest/get-started/labels/structured-metadata/) for your logs. Cardinality is not a concern here.
+  - Example: `structured_metadata: "run_id=${{ github.run_id }}"`
 - **Loki Endpoint**: Specify the Loki instance URL with `loki_endpoint`.
 - **Retry Configuration**: Use the `max_retries` and `retry_interval_seconds` inputs to control log fetch retry behavior.
 

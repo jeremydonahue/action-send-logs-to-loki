@@ -12,11 +12,13 @@ LOKI_ENDPOINT = os.getenv("LOKI_ENDPOINT")
 LABELS = os.getenv("LABELS", "job=github-actions")
 TENANT = os.getenv("TENANT", "action-send-logs-to-loki")
 GITHUB_REPO = os.getenv("GITHUB_REPOSITORY")
+STRUCTURED_METADATA = os.getenv("STRUCTURED_METADATA", "")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))  # Defaults to 5 retries if not setup in the action
 RETRY_INTERVAL_SECONDS = int(os.getenv("RETRY_INTERVAL_SECONDS", 10))  # Defaults to 10 seconds if not setup in the action
 
 GITHUB_HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 LOKI_HEADERS = {"X-Scope-OrgID": TENANT}
+structured_metadata = {k: v for k, v in [item.split("=", 1) for item in STRUCTURED_METADATA.split(",") if "=" in item]}
 
 def sanitize_labels(labels):
     """Sanitize labels to comply with Loki's label naming rules."""
@@ -48,6 +50,9 @@ def parse_log_line(log_line):
     
     return timestamp_ns, message
 
+def parse_logs(logs):
+    """Parse logs to extract timestamp and message."""
+    return [parse_log_line(log) for log in logs if log]
 
 def get_jobs(run_id):
     """Fetch all jobs metadata for the current workflow run."""
@@ -63,7 +68,9 @@ def fetch_job_logs(job_id):
     logs_url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/jobs/{job_id}/logs"
     response = requests.get(logs_url, headers=GITHUB_HEADERS)
     if response.status_code == 200:
-        return response.text.splitlines()
+        logs = response.text.splitlines()
+        logs = parse_logs(logs)
+        return logs
     elif response.status_code == 403:
         print(f"Logs not ready yet for job ID: {job_id}")
         return []
@@ -80,15 +87,12 @@ def push_to_loki(logs, labels, job_name=None, job_id=None):
 
     # Sanitize labels before sending to Loki
     sanitized_labels = sanitize_labels(labels)
-
-    # Parse each log line to extract timestamp and message
-    parsed_logs = [parse_log_line(log) for log in logs if log]
     
     payload = {
         "streams": [
             {
                 "stream": sanitized_labels,
-                "values": [[timestamp_ns, message] for timestamp_ns, message in parsed_logs],
+                "values": [[timestamp_ns, message, structured_metadata] for timestamp_ns, message in logs],
             }
         ]
     }

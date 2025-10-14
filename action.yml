@@ -12,6 +12,10 @@ inputs:
     description: "Loki tenant"
     required: false
     default: "action-send-logs-to-loki"
+  structured_metadata:
+    description: "Structured metadata for logs (comma-separated key=value pairs)"
+    required: false
+    default: ""
   github_token:
     description: "GitHub token for API authentication"
     required: true
@@ -43,4 +47,5 @@ runs:
         LABELS: ${{ inputs.labels }}
         MAX_RETRIES: ${{ inputs.max_retries }}
         RETRY_INTERVAL_SECONDS: ${{ inputs.retry_interval_seconds }}
+        STRUCTURED_METADATA: ${{ inputs.structured_metadata }}
       run: python3 "$GITHUB_ACTION_PATH/push_logs.py"
