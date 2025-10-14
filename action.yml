@@ -31,6 +31,10 @@ inputs:
     description: "Collapse multi-line pretty-printed JSON into single log lines"
     required: false
     default: "true"
+  json_wrap:
+    description: "Wrap non-JSON logs with JSON message key"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -52,5 +56,6 @@ runs:
         MAX_RETRIES: ${{ inputs.max_retries }}
         RETRY_INTERVAL_SECONDS: ${{ inputs.retry_interval_seconds }}
         STRUCTURED_METADATA: ${{ inputs.structured_metadata }}
+        JSON_WRAP: ${{ inputs.json_wrap }}
         COLLAPSE_JSON_LOGS: ${{ inputs.collapse_json_logs }}
       run: python3 "$GITHUB_ACTION_PATH/push_logs.py"

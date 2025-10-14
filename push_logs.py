@@ -15,7 +15,9 @@ GITHUB_REPO = os.getenv("GITHUB_REPOSITORY")
 STRUCTURED_METADATA = os.getenv("STRUCTURED_METADATA", "")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))  # Defaults to 5 retries if not setup in the action
 RETRY_INTERVAL_SECONDS = int(os.getenv("RETRY_INTERVAL_SECONDS", 10))  # Defaults to 10 seconds if not setup in the action
+JSON_WRAP = os.getenv("JSON_WRAP", "false")
 COLLAPSE_JSON_LOGS = os.getenv("COLLAPSE_JSON_LOGS", "true")
+
 GITHUB_HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 LOKI_HEADERS = {"X-Scope-OrgID": TENANT}
 structured_metadata = {k: v for k, v in [item.split("=", 1) for item in STRUCTURED_METADATA.split(",") if "=" in item]}
@@ -53,6 +55,17 @@ def parse_log_line(log_line):
 def parse_logs(logs):
     """Parse logs to extract timestamp and message."""
     return [parse_log_line(log) for log in logs if log]
+
+def wrap_log_with_json(log):
+    """Wrap non-JSON log with JSON."""
+    ts, message = log
+    if message.startswith('{'):
+        return log
+    return ts, json.dumps({"message": message})
+
+def wrap_logs_with_json(logs):
+    """Wrap non-JSON logs with JSON."""
+    return [wrap_log_with_json(log) for log in logs]
 
 def collapse_json_logs(parsed_logs):
     """Collapse multi-line pretty-printed JSON into single log lines.
@@ -128,6 +141,8 @@ def fetch_job_logs(job_id):
         logs = parse_logs(logs)
         if COLLAPSE_JSON_LOGS == "true":
             logs = collapse_json_logs(logs)
+        if JSON_WRAP == "true":
+            logs = wrap_logs_with_json(logs)
         return logs
     elif response.status_code == 403:
         print(f"Logs not ready yet for job ID: {job_id}")
