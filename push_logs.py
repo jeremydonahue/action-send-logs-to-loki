@@ -3,6 +3,7 @@ import json
 import requests
 import re
 import time
+from datetime import datetime
 
 # Environment Variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -27,6 +28,26 @@ def sanitize_labels(labels):
             raise ValueError(f"Invalid label key after sanitization: '{k}'")
         sanitized[key] = v
     return sanitized
+
+def parse_log_line(log_line):
+    """Parse log line to extract timestamp and message.
+    
+    Expected format: '2025-10-13T22:51:56.2115421Z message'
+    Returns: (timestamp_ns, message) tuple
+    """
+    # Strip BOM character if present (can appear on first line)
+    log_line = log_line.lstrip('ï»¿')
+    
+    parts = log_line.split(" ", 1)
+    timestamp_str = parts[0]
+    message = parts[1]
+    
+    # Parse timestamp and convert to nanoseconds since epoch
+    dt = datetime.fromisoformat(timestamp_str)
+    timestamp_ns = str(int(dt.timestamp() * 1e9))
+    
+    return timestamp_ns, message
+
 
 def get_jobs(run_id):
     """Fetch all jobs metadata for the current workflow run."""
@@ -60,11 +81,14 @@ def push_to_loki(logs, labels, job_name=None, job_id=None):
     # Sanitize labels before sending to Loki
     sanitized_labels = sanitize_labels(labels)
 
+    # Parse each log line to extract timestamp and message
+    parsed_logs = [parse_log_line(log) for log in logs if log]
+    
     payload = {
         "streams": [
             {
                 "stream": sanitized_labels,
-                "values": [[str(int(time.time() * 1e9)), log] for log in logs if log],  # Include timestamps
+                "values": [[timestamp_ns, message] for timestamp_ns, message in parsed_logs],
             }
         ]
     }
