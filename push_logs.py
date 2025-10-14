@@ -15,7 +15,7 @@ GITHUB_REPO = os.getenv("GITHUB_REPOSITORY")
 STRUCTURED_METADATA = os.getenv("STRUCTURED_METADATA", "")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))  # Defaults to 5 retries if not setup in the action
 RETRY_INTERVAL_SECONDS = int(os.getenv("RETRY_INTERVAL_SECONDS", 10))  # Defaults to 10 seconds if not setup in the action
-
+COLLAPSE_JSON_LOGS = os.getenv("COLLAPSE_JSON_LOGS", "true")
 GITHUB_HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 LOKI_HEADERS = {"X-Scope-OrgID": TENANT}
 structured_metadata = {k: v for k, v in [item.split("=", 1) for item in STRUCTURED_METADATA.split(",") if "=" in item]}
@@ -54,6 +54,62 @@ def parse_logs(logs):
     """Parse logs to extract timestamp and message."""
     return [parse_log_line(log) for log in logs if log]
 
+def collapse_json_logs(parsed_logs):
+    """Collapse multi-line pretty-printed JSON into single log lines.
+    
+    Takes a list of (timestamp_ns, message) tuples and collapses any
+    pretty-printed JSON objects into single lines. Only collapses JSON
+    when the opening { and closing } are alone on their lines.
+    """
+    result = []
+    json_buffer = []
+    json_timestamp = None
+    in_json_block = False
+    
+    for timestamp_ns, message in parsed_logs:
+        stripped = message.strip()
+        
+        if not in_json_block and stripped == '{':
+            # Start of JSON block (opening brace alone on line)
+            json_timestamp = timestamp_ns
+            json_buffer = [stripped]
+            in_json_block = True
+        elif in_json_block and stripped == '}':
+            # End of JSON block (closing brace alone on line)
+            json_buffer.append(stripped)
+            
+            # Collapse the JSON block
+            collapsed = ' '.join(json_buffer)
+            # Try to parse and re-serialize to ensure it's valid and compact
+            try:
+                parsed_json = json.loads(collapsed)
+                collapsed = json.dumps(parsed_json, separators=(',', ':'))
+            except json.JSONDecodeError:
+                # If parsing fails, just use the joined string
+                pass
+            result.append((json_timestamp, collapsed))
+            
+            json_buffer = []
+            json_timestamp = None
+            in_json_block = False
+        elif in_json_block:
+            # Inside a JSON block
+            json_buffer.append(stripped)
+        else:
+            # Regular log line
+            result.append((timestamp_ns, message))
+    
+    # If there's an unclosed JSON block, add all lines as-is
+    if json_buffer:
+        for i, line in enumerate(json_buffer):
+            if i == 0:
+                result.append((json_timestamp, line))
+            else:
+                # We don't have timestamps for these lines, use the original timestamp
+                result.append((json_timestamp, line))
+    
+    return result
+
 def get_jobs(run_id):
     """Fetch all jobs metadata for the current workflow run."""
     print(f"Fetching job metadata for workflow run ID: {run_id}")
@@ -70,6 +126,8 @@ def fetch_job_logs(job_id):
     if response.status_code == 200:
         logs = response.text.splitlines()
         logs = parse_logs(logs)
+        if COLLAPSE_JSON_LOGS == "true":
+            logs = collapse_json_logs(logs)
         return logs
     elif response.status_code == 403:
         print(f"Logs not ready yet for job ID: {job_id}")
