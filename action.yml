@@ -8,6 +8,10 @@ inputs:
     description: "Custom labels for logs (comma-separated key=value pairs)"
     required: false
     default: "job=github-actions"
+  tenant:
+    description: "Loki tenant"
+    required: false
+    default: "action-send-logs-to-loki"
   github_token:
     description: "GitHub token for API authentication"
     required: true
@@ -35,6 +39,7 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github_token }}
         RUN_ID: ${{ github.run_id }}
         LOKI_ENDPOINT: ${{ inputs.loki_endpoint }}
+        TENANT: ${{ inputs.tenant }}
         LABELS: ${{ inputs.labels }}
         MAX_RETRIES: ${{ inputs.max_retries }}
         RETRY_INTERVAL_SECONDS: ${{ inputs.retry_interval_seconds }}

@@ -9,11 +9,13 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 RUN_ID = os.getenv("RUN_ID")
 LOKI_ENDPOINT = os.getenv("LOKI_ENDPOINT")
 LABELS = os.getenv("LABELS", "job=github-actions")
+TENANT = os.getenv("TENANT", "action-send-logs-to-loki")
 GITHUB_REPO = os.getenv("GITHUB_REPOSITORY")
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))  # Defaults to 5 retries if not setup in the action
 RETRY_INTERVAL_SECONDS = int(os.getenv("RETRY_INTERVAL_SECONDS", 10))  # Defaults to 10 seconds if not setup in the action
 
-HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+GITHUB_HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+LOKI_HEADERS = {"X-Scope-OrgID": TENANT}
 
 def sanitize_labels(labels):
     """Sanitize labels to comply with Loki's label naming rules."""
@@ -30,7 +32,7 @@ def get_jobs(run_id):
     """Fetch all jobs metadata for the current workflow run."""
     print(f"Fetching job metadata for workflow run ID: {run_id}")
     jobs_url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs/{run_id}/jobs"
-    response = requests.get(jobs_url, headers=HEADERS)
+    response = requests.get(jobs_url, headers=GITHUB_HEADERS)
     if response.status_code != 200:
         raise Exception(f"Failed to fetch jobs: {response.text}")
     return response.json().get("jobs", [])
@@ -38,7 +40,7 @@ def get_jobs(run_id):
 def fetch_job_logs(job_id):
     """Fetch logs for a specific job."""
     logs_url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/jobs/{job_id}/logs"
-    response = requests.get(logs_url, headers=HEADERS)
+    response = requests.get(logs_url, headers=GITHUB_HEADERS)
     if response.status_code == 200:
         return response.text.splitlines()
     elif response.status_code == 403:
@@ -68,7 +70,7 @@ def push_to_loki(logs, labels, job_name=None, job_id=None):
         ]
     }
     print(f"Pushing logs to Loki: {LOKI_ENDPOINT}")
-    response = requests.post(f"{LOKI_ENDPOINT}/loki/api/v1/push", json=payload)
+    response = requests.post(f"{LOKI_ENDPOINT}/loki/api/v1/push", json=payload, headers=LOKI_HEADERS)
     if response.status_code == 204:
         print("Logs successfully sent to Loki.")
     else:
