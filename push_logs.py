@@ -156,11 +156,12 @@ def fetch_job_logs(job_id):
 
 def push_to_loki(logs, labels, job_name=None, job_id=None):
     """Push logs to Loki."""
-    # Add job name and job ID as additional labels if provided
+    # Add job name and job ID as additional structured metadata if provided
+    metadata = structured_metadata.copy()
     if job_name:
-        labels += f",job_name={job_name}"
+        metadata["job_name"] = job_name
     if job_id:
-        labels += f",job_id={job_id}"
+        metadata["job_id"] = job_id
 
     # Sanitize labels before sending to Loki
     sanitized_labels = sanitize_labels(labels)
@@ -169,7 +170,7 @@ def push_to_loki(logs, labels, job_name=None, job_id=None):
         "streams": [
             {
                 "stream": sanitized_labels,
-                "values": [[timestamp_ns, message, structured_metadata] for timestamp_ns, message in logs],
+                "values": [[timestamp_ns, message, metadata] for timestamp_ns, message in logs],
             }
         ]
     }
