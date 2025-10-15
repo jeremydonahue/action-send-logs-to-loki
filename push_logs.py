@@ -47,6 +47,10 @@ def parse_log_line(log_line):
     message = parts[1]
     
     # Parse timestamp and convert to nanoseconds since epoch
+    # Python < 3.11 doesn't support more than 6 decimal places for fractional seconds
+    # GitHub Actions uses 7 decimal places, so we need to truncate. Also, we need to 
+    # replace Z with +00:00 in the timestamp.
+    timestamp_str = timestamp_str.rstrip("Z")[:-1] + "+00:00"
     dt = datetime.fromisoformat(timestamp_str)
     timestamp_ns = str(int(dt.timestamp() * 1e9))
     
